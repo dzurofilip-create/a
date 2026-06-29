@@ -305,19 +305,20 @@
         /************************************************************
          * KOMPATIBILITA PRE live.js (TikTok Live Connector)
          ************************************************************/
-        window.addPointsFromTikTok = function(amount, username = "Používateľ", eventType = "darček") {
-            updateCounter(amount, `TikTok - ${username}`);
-            logAction(`📱 ${username} poslal ${eventType} (+${formatNumber(amount)})`);
+        window.addPointsFromTikTok = function(action, points) {
+            updateCounter(points, `TikTok - ${action}`);
+            logAction(`📱 Akcia [${action}] zmenila body o: ${points > 0 ? '+' : ''}${formatNumber(points)}`);
         };
 
-        // WEBSOCKET PREPOJENIE NA live.js SERVER
+        // WEBSOCKET PREPOJENIE NA live.js SERVER (Port zmenený na 3000)
         function connectWebSocket() {
-            const ws = new WebSocket('ws://localhost:8080');
+            const ws = new WebSocket('ws://localhost:3000');
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    window.addPointsFromTikTok(data.amount, data.username, data.giftName);
+                    // Spracovanie dát prispôsobené tvojmu formátu { action, points }
+                    window.addPointsFromTikTok(data.action, data.points);
                 } catch (e) {
                     console.error("Chyba spracovania dát:", e);
                 }
@@ -332,7 +333,7 @@
             ws.onclose = () => {
                 connStatus.textContent = "Live.js Odpojené";
                 connStatus.style.backgroundColor = "#e74c3c";
-                // Automatický pokus o znovupripojenie každých 5 sekúnd, ak vypneš/zapneš node skript
+                // Automatický pokus o znovupripojenie každých 5 sekúnd
                 setTimeout(connectWebSocket, 5000);
             };
         }
