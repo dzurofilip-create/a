@@ -252,28 +252,28 @@
                     <tr>
                         <td><strong>Reset</strong></td>
                         <td>
-                            <button class="btn-admin btn-admin-reset" onclick="resetCounterDirect()">Reset na 0</button>
+                            <button class="btn-admin btn-admin-reset" onclick="triggerAdminAction('RESET_DIRECT')">Reset na 0</button>
                         </td>
                     </tr>
                     <tr>
                         <td><strong>± 10 bodov</strong></td>
                         <td>
-                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(10)">Pridať 10</button>
-                            <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-10)">-10</button>
+                            <button class="btn-admin btn-admin-add" onclick="triggerAdminAction('MODIFY', 10)">Pridať 10</button>
+                            <button class="btn-admin btn-admin-sub" onclick="triggerAdminAction('MODIFY', -10)">-10</button>
                         </td>
                     </tr>
                     <tr>
                         <td><strong>± 300 bodov</strong></td>
                         <td>
-                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(300)">Pridať 300</button>
-                            <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-300)">-300</button>
+                            <button class="btn-admin btn-admin-add" onclick="triggerAdminAction('MODIFY', 300)">Pridať 300</button>
+                            <button class="btn-admin btn-admin-sub" onclick="triggerAdminAction('MODIFY', -300)">-300</button>
                         </td>
                     </tr>
                     <tr>
                         <td><strong>± 1 000 bodov</strong></td>
                         <td>
-                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(1000)">Pridať 1k</button>
-                            <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-1000)">-1k</button>
+                            <button class="btn-admin btn-admin-add" onclick="triggerAdminAction('MODIFY', 1000)">Pridať 1k</button>
+                            <button class="btn-admin btn-admin-sub" onclick="triggerAdminAction('MODIFY', -1000)">-1k</button>
                         </td>
                     </tr>
                     <tr>
@@ -281,14 +281,14 @@
                             <input type="number" id="customAmount" class="input-custom" value="5000">
                         </td>
                         <td>
-                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(parseInt(document.getElementById('customAmount').value) || 0)">Vlastné</button>
-                            <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-(parseInt(document.getElementById('customAmount').value) || 0))">Odobrať</button>
+                            <button class="btn-admin btn-admin-add" onclick="triggerAdminAction('MODIFY', parseInt(document.getElementById('customAmount').value) || 0)">Vlastné</button>
+                            <button class="btn-admin btn-admin-sub" onclick="triggerAdminAction('MODIFY', -(parseInt(document.getElementById('customAmount').value) || 0))">Odobrať</button>
                         </td>
                     </tr>
                     <tr>
                         <td><strong>Trojnásobok x3</strong></td>
                         <td>
-                            <button class="btn-admin btn-admin-mult" onclick="activateMultiplier()">Aktivovať x3 (1 min)</button>
+                            <button class="btn-admin btn-admin-mult" onclick="triggerAdminAction('MULTIPLIER')">Aktivovať x3 (1 min)</button>
                         </td>
                     </tr>
                 </tbody>
@@ -299,7 +299,7 @@
                 <span class="status-badge" id="connStatus">Live.js Odpojené</span>
             </div>
 
-            <button class="btn-reset" onclick="resetCounter()">Resetovať celé počítadlo (s potvrdením)</button>
+            <button class="btn-reset" onclick="handleFullReset()">Resetovať celé počítadlo (s potvrdením)</button>
 
             <h3 style="margin-top: 20px; font-size: 0.95rem; color: #555;">História zmien:</h3>
             <div class="log-container" id="activityLog">
@@ -312,6 +312,7 @@
     <script>
         let count = 0;
         const target = 999999;
+        let globalSocket = null;
         
         // Multiplier premenné
         let isMultiplierActive = false;
@@ -334,7 +335,6 @@
             activityLog.innerHTML = `[${time}] ${message}<br>` + activityLog.innerHTML;
         }
 
-        // Funkcia na vyvolanie lietajúcej animácie čísla
         function triggerFloatAnimation(amount) {
             const floatText = document.createElement('div');
             floatText.classList.add('floating-text');
@@ -344,7 +344,7 @@
                 floatText.textContent = `+${formatNumber(amount)}`;
             } else {
                 floatText.classList.add('minus');
-                floatText.textContent = `${formatNumber(amount)}`; // Mínus je už v stringu obsiahnuté
+                floatText.textContent = `${formatNumber(amount)}`;
             }
             
             counterContainer.appendChild(floatText);
@@ -356,31 +356,30 @@
 
         function updateCounter(amount, source = "Klik") {
             let finalAmount = amount;
-            if (isMultiplierActive) {
+            if (isMultiplierActive && source !== "SYSTEM_RESET") {
                 finalAmount = amount * 3;
             }
 
-            const newCount = count + finalAmount;
+            // Ak ide o reset, nastavíme priamo natvrdo nulu
+            const newCount = (source === "SYSTEM_RESET") ? 0 : count + finalAmount;
             
-            // Odstránená podmienka, ktorá držala nulu (teraz ide normálne do mínusu)
             if (newCount >= target) {
                 count = target;
                 mainPlusBtn.disabled = true;
                 logAction(`🎉 DOSIAHNUTÝ CIEĽ! (Zdroj: ${source}${isMultiplierActive ? ' + x3 Bonus' : ''})`);
             } else {
                 count = newCount;
-                mainPlusBtn.disabled = false; // Tlačidlo sa znova povolí, ak klesne pod cieľ
+                mainPlusBtn.disabled = false;
             }
 
             streamCounter.textContent = formatNumber(count);
             
-            if (finalAmount !== 0) {
+            if (finalAmount !== 0 && source !== "SYSTEM_RESET") {
                 triggerFloatAnimation(finalAmount);
             }
         }
 
-        // Aktivácia trojnásobku na 1 minútu (60 sekúnd)
-        function activateMultiplier() {
+        function localActivateMultiplier() {
             if (isMultiplierActive) {
                 logAction("⚠️ Trojnásobok už beží. Čas bol reštartovaný na 60s.");
                 multiplierDuration = 60;
@@ -408,56 +407,76 @@
             }, 1000);
         }
 
-        // +1 cez veľké zelené tlačidlo
-        mainPlusBtn.addEventListener('click', () => {
-            updateCounter(1, "Manuálne kliknutie");
-        });
-
-        // Admin tabuľka (akcie tlačidiel)
-        function modifyPoints(amount) {
-            updateCounter(amount, "Admin panel");
-            logAction(`Admin zmenil základ o: ${amount > 0 ? '+' : ''}${formatNumber(amount)} ${isMultiplierActive ? '(Vynásobené x3)' : ''}`);
-        }
-
-        // Rýchly reset bez dialógu
-        function resetCounterDirect() {
+        function localResetFull() {
             count = 0;
             streamCounter.textContent = "0";
             mainPlusBtn.disabled = false;
-            logAction("🔄 Počítadlo nastavené na 0 z Admin panelu.");
+            
+            clearInterval(multiplierInterval);
+            isMultiplierActive = false;
+            multiplierTimer.style.display = "none";
+            
+            logAction("🔄 Počítadlo kompletne vynulované.");
         }
 
-        // Globálny reset s dialógom
-        function resetCounter() {
-            if(confirm("Naozaj vynulovať počítadlo?")) {
-                count = 0;
-                streamCounter.textContent = "0";
-                mainPlusBtn.disabled = false;
-                
-                clearInterval(multiplierInterval);
-                isMultiplierActive = false;
-                multiplierTimer.style.display = "none";
-                
-                logAction("🔄 Počítadlo kompletne vynulované.");
+        // Veľké zelené plus tlačidlo posiela požiadavku na server
+        mainPlusBtn.addEventListener('click', () => {
+            triggerAdminAction('MODIFY', 1);
+        });
+
+        // Pomocná funkcia na odosielanie admin akcií cez WebSocket na server
+        function triggerAdminAction(type, value = 0) {
+            if (globalSocket && globalSocket.readyState === WebSocket.OPEN) {
+                globalSocket.send(JSON.stringify({
+                    type: type,
+                    value: value
+                }));
+            } else {
+                // Fallback ak by nebol server online
+                if (type === 'MODIFY') updateCounter(value, "Lokálny Admin");
+                if (type === 'RESET_DIRECT') updateCounter(0, "SYSTEM_RESET");
+                if (type === 'MULTIPLIER') localActivateMultiplier();
+            }
+        }
+
+        function handleFullReset() {
+            if(confirm("Naozaj vynulovať počítadlo pre všetkých?")) {
+                triggerAdminAction('RESET_FULL');
             }
         }
 
         /************************************************************
-         * KOMPATIBILITA PRE live.js (TikTok Live Connector)
+         * WEBSOCKET PREPOJENIE NA SERVER
          ************************************************************/
-        window.addPointsFromTikTok = function(action, points) {
-            updateCounter(points, `TikTok - ${action}`);
-            logAction(`📱 Akcia [${action}] zmenila základné body o: ${points > 0 ? '+' : ''}${formatNumber(points)} ${isMultiplierActive ? '(Vynásobené x3)' : ''}`);
-        };
-
-        // WEBSOCKET PREPOJENIE NA live.js SERVER
         function connectWebSocket() {
             const ws = new WebSocket('ws://localhost:3000');
+            globalSocket = ws;
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    window.addPointsFromTikTok(data.action, data.points);
+                    
+                    // Spracovanie prichádzajúcich eventov zo servera
+                    if (data.type === "TIKTOK_EVENT" || data.action) {
+                        const actionName = data.action || "TikTok Akcia";
+                        const points = data.points || 0;
+                        updateCounter(points, actionName);
+                        logAction(`📱 Akcia [${actionName}] zmenila základné body o: ${points > 0 ? '+' : ''}${formatNumber(points)} ${isMultiplierActive ? '(Vynásobené x3)' : ''}`);
+                    } 
+                    else if (data.type === "ADMIN_MODIFY") {
+                        updateCounter(data.value, "Admin panel");
+                        logAction(`Admin zmenil základ o: ${data.value > 0 ? '+' : ''}${formatNumber(data.value)} ${isMultiplierActive ? '(Vynásobené x3)' : ''}`);
+                    }
+                    else if (data.type === "ADMIN_RESET_DIRECT") {
+                        updateCounter(0, "SYSTEM_RESET");
+                        logAction("🔄 Počítadlo nastavené na 0 z Admin panelu.");
+                    }
+                    else if (data.type === "ADMIN_MULTIPLIER") {
+                        localActivateMultiplier();
+                    }
+                    else if (data.type === "ADMIN_RESET_FULL") {
+                        localResetFull();
+                    }
                 } catch (e) {
                     console.error("Chyba spracovania dát:", e);
                 }
@@ -472,7 +491,8 @@
             ws.onclose = () => {
                 connStatus.textContent = "Live.js Odpojené";
                 connStatus.style.backgroundColor = "#e74c3c";
-                setTimeout(connectWebSocket, 5000);
+                globalSocket = null;
+                setTimeout(connectWebSocket, 5000); // Reconnect
             };
         }
 
