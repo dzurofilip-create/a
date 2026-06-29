@@ -44,7 +44,7 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.05);
         }
 
-        /* Hlavný box s počítadlom (pôvodný štýl) */
+        /* Hlavný box s počítadlom */
         .counter-box {
             background-color: white;
             padding: 40px;
@@ -53,6 +53,7 @@
             display: inline-block;
             width: 100%;
             max-width: 450px;
+            position: relative;
         }
 
         h1 {
@@ -61,12 +62,53 @@
             margin-bottom: 20px;
         }
 
+        .counter-container {
+            position: relative;
+            display: inline-block;
+            margin: 20px 0;
+        }
+
         .counter-display {
             font-size: 3.5rem;
             font-weight: bold;
             color: #2c3e50;
-            margin: 20px 0;
             font-variant-numeric: tabular-nums;
+        }
+
+        /* Časovač pre trojnásobok pod číslom */
+        .multiplier-timer {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #e67e22;
+            margin-top: 5px;
+            min-height: 24px;
+            display: none;
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.7; }
+            to { opacity: 1; }
+        }
+
+        /* Animácia pre lietajúce čísla */
+        .floating-text {
+            position: absolute;
+            font-size: 1.8rem;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+
+        .floating-text.plus { color: #2ecc71; }
+        .floating-text.minus { color: #e74c3c; }
+
+        @keyframes floatUp {
+            0% { opacity: 1; top: 0px; }
+            100% { opacity: 0; top: -60px; }
         }
 
         /* Veľké plus tlačidlo pod číslom */
@@ -85,21 +127,15 @@
             margin-top: 10px;
         }
 
-        .btn-main-plus:hover {
-            background-color: #27ae60;
-        }
-
-        .btn-main-plus:active {
-            transform: scale(0.98);
-        }
-
+        .btn-main-plus:hover { background-color: #27ae60; }
+        .btn-main-plus:active { transform: scale(0.98); }
         .btn-main-plus:disabled {
             background-color: #95a5a6;
             cursor: not-allowed;
             transform: none;
         }
 
-        /* Administračná tabuľka pre väčšie čiastky */
+        /* Administračná tabuľka */
         .admin-title {
             font-size: 1.3rem;
             color: #333;
@@ -142,6 +178,9 @@
         .btn-admin:hover { opacity: 0.85; }
         .btn-admin-add { background-color: #3498db; color: white; }
         .btn-admin-sub { background-color: #e74c3c; color: white; }
+        .btn-admin-mult { background-color: #e67e22; color: white; }
+        .btn-admin-reset { background-color: #7f8c8d; color: white; }
+        
         .btn-reset { background-color: #95a5a6; color: white; width: 100%; margin-top: 15px; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
 
         .input-custom {
@@ -161,7 +200,7 @@
             border-radius: 4px;
             font-size: 0.8rem;
             font-weight: bold;
-            background-color: #e74c3c; /* Predvolene červená, kým sa nepripojí */
+            background-color: #e74c3c;
             color: white;
             transition: background-color 0.3s;
         }
@@ -187,7 +226,11 @@
         <div class="left-panel">
             <div class="counter-box">
                 <h1>Klikaj až do 999 999!</h1>
-                <div class="counter-display" id="streamCounter">0</div>
+                <div class="counter-container" id="counterContainer">
+                    <div class="counter-display" id="streamCounter">0</div>
+                </div>
+                
+                <div class="multiplier-timer" id="multiplierTimer">🔥 x3 Aktívne: 60s</div>
                 
                 <button class="btn-main-plus" id="mainPlusBtn">+</button>
                 
@@ -207,14 +250,27 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><strong>+100 bodov</strong></td>
+                        <td><strong>Reset</strong></td>
                         <td>
-                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(100)">Pridať 100</button>
-                            <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-100)">-100</button>
+                            <button class="btn-admin btn-admin-reset" onclick="resetCounterDirect()">Reset na 0</button>
                         </td>
                     </tr>
                     <tr>
-                        <td><strong>+1 000 bodov</strong></td>
+                        <td><strong>± 10 bodov</strong></td>
+                        <td>
+                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(10)">Pridať 10</button>
+                            <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-10)">-10</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>± 300 bodov</strong></td>
+                        <td>
+                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(300)">Pridať 300</button>
+                            <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-300)">-300</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>± 1 000 bodov</strong></td>
                         <td>
                             <button class="btn-admin btn-admin-add" onclick="modifyPoints(1000)">Pridať 1k</button>
                             <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-1000)">-1k</button>
@@ -225,8 +281,14 @@
                             <input type="number" id="customAmount" class="input-custom" value="5000">
                         </td>
                         <td>
-                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(parseInt(document.getElementById('customAmount').value) || 0)">Pridať vlastné</button>
+                            <button class="btn-admin btn-admin-add" onclick="modifyPoints(parseInt(document.getElementById('customAmount').value) || 0)">Vlastné</button>
                             <button class="btn-admin btn-admin-sub" onclick="modifyPoints(-(parseInt(document.getElementById('customAmount').value) || 0))">Odobrať</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Trojnásobok x3</strong></td>
+                        <td>
+                            <button class="btn-admin btn-admin-mult" onclick="activateMultiplier()">Aktivovať x3 (1 min)</button>
                         </td>
                     </tr>
                 </tbody>
@@ -237,7 +299,7 @@
                 <span class="status-badge" id="connStatus">Live.js Odpojené</span>
             </div>
 
-            <button class="btn-reset" onclick="resetCounter()">Resetovať celé počítadlo</button>
+            <button class="btn-reset" onclick="resetCounter()">Resetovať celé počítadlo (s potvrdením)</button>
 
             <h3 style="margin-top: 20px; font-size: 0.95rem; color: #555;">História zmien:</h3>
             <div class="log-container" id="activityLog">
@@ -250,8 +312,15 @@
     <script>
         let count = 0;
         const target = 999999;
+        
+        // Multiplier premenné
+        let isMultiplierActive = false;
+        let multiplierDuration = 0;
+        let multiplierInterval = null;
 
         const streamCounter = document.getElementById('streamCounter');
+        const counterContainer = document.getElementById('counterContainer');
+        const multiplierTimer = document.getElementById('multiplierTimer');
         const mainPlusBtn = document.getElementById('mainPlusBtn');
         const activityLog = document.getElementById('activityLog');
         const connStatus = document.getElementById('connStatus');
@@ -265,21 +334,78 @@
             activityLog.innerHTML = `[${time}] ${message}<br>` + activityLog.innerHTML;
         }
 
-        function updateCounter(amount, source = "Klik") {
-            const newCount = count + amount;
+        // Funkcia na vyvolanie lietajúcej animácie čísla
+        function triggerFloatAnimation(amount) {
+            const floatText = document.createElement('div');
+            floatText.classList.add('floating-text');
             
-            if (newCount < 0) {
-                count = 0;
-            } else if (newCount >= target) {
+            if (amount >= 0) {
+                floatText.classList.add('plus');
+                floatText.textContent = `+${formatNumber(amount)}`;
+            } else {
+                floatText.classList.add('minus');
+                floatText.textContent = `${formatNumber(amount)}`; // Mínus je už v stringu obsiahnuté
+            }
+            
+            counterContainer.appendChild(floatText);
+            
+            setTimeout(() => {
+                floatText.remove();
+            }, 800);
+        }
+
+        function updateCounter(amount, source = "Klik") {
+            let finalAmount = amount;
+            if (isMultiplierActive) {
+                finalAmount = amount * 3;
+            }
+
+            const newCount = count + finalAmount;
+            
+            // Odstránená podmienka, ktorá držala nulu (teraz ide normálne do mínusu)
+            if (newCount >= target) {
                 count = target;
                 mainPlusBtn.disabled = true;
-                logAction(`🎉 DOSIAHNUTÝ CIEĽ! (Zdroj: ${source})`);
+                logAction(`🎉 DOSIAHNUTÝ CIEĽ! (Zdroj: ${source}${isMultiplierActive ? ' + x3 Bonus' : ''})`);
             } else {
                 count = newCount;
-                mainPlusBtn.disabled = false;
+                mainPlusBtn.disabled = false; // Tlačidlo sa znova povolí, ak klesne pod cieľ
             }
 
             streamCounter.textContent = formatNumber(count);
+            
+            if (finalAmount !== 0) {
+                triggerFloatAnimation(finalAmount);
+            }
+        }
+
+        // Aktivácia trojnásobku na 1 minútu (60 sekúnd)
+        function activateMultiplier() {
+            if (isMultiplierActive) {
+                logAction("⚠️ Trojnásobok už beží. Čas bol reštartovaný na 60s.");
+                multiplierDuration = 60;
+                return;
+            }
+
+            isMultiplierActive = true;
+            multiplierDuration = 60;
+            multiplierTimer.style.display = "block";
+            multiplierTimer.textContent = `🔥 x3 Aktívne: ${multiplierDuration}s`;
+            
+            logAction("🚀 ADMIN ZAPOL TROJNÁSOBOK (x3) NA 1 MINÚTU!");
+
+            clearInterval(multiplierInterval);
+            multiplierInterval = setInterval(() => {
+                multiplierDuration--;
+                if (multiplierDuration <= 0) {
+                    clearInterval(multiplierInterval);
+                    isMultiplierActive = false;
+                    multiplierTimer.style.display = "none";
+                    logAction("⏱️ Platnosť trojnásobku (x3) vypršala.");
+                } else {
+                    multiplierTimer.textContent = `🔥 x3 Aktívne: ${multiplierDuration}s`;
+                }
+            }, 1000);
         }
 
         // +1 cez veľké zelené tlačidlo
@@ -287,17 +413,31 @@
             updateCounter(1, "Manuálne kliknutie");
         });
 
-        // Admin tabuľka (väčšie sumy)
+        // Admin tabuľka (akcie tlačidiel)
         function modifyPoints(amount) {
             updateCounter(amount, "Admin panel");
-            logAction(`Admin zmenil body o: ${amount > 0 ? '+' : ''}${formatNumber(amount)}`);
+            logAction(`Admin zmenil základ o: ${amount > 0 ? '+' : ''}${formatNumber(amount)} ${isMultiplierActive ? '(Vynásobené x3)' : ''}`);
         }
 
+        // Rýchly reset bez dialógu
+        function resetCounterDirect() {
+            count = 0;
+            streamCounter.textContent = "0";
+            mainPlusBtn.disabled = false;
+            logAction("🔄 Počítadlo nastavené na 0 z Admin panelu.");
+        }
+
+        // Globálny reset s dialógom
         function resetCounter() {
             if(confirm("Naozaj vynulovať počítadlo?")) {
                 count = 0;
                 streamCounter.textContent = "0";
                 mainPlusBtn.disabled = false;
+                
+                clearInterval(multiplierInterval);
+                isMultiplierActive = false;
+                multiplierTimer.style.display = "none";
+                
                 logAction("🔄 Počítadlo kompletne vynulované.");
             }
         }
@@ -307,17 +447,16 @@
          ************************************************************/
         window.addPointsFromTikTok = function(action, points) {
             updateCounter(points, `TikTok - ${action}`);
-            logAction(`📱 Akcia [${action}] zmenila body o: ${points > 0 ? '+' : ''}${formatNumber(points)}`);
+            logAction(`📱 Akcia [${action}] zmenila základné body o: ${points > 0 ? '+' : ''}${formatNumber(points)} ${isMultiplierActive ? '(Vynásobené x3)' : ''}`);
         };
 
-        // WEBSOCKET PREPOJENIE NA live.js SERVER (Port zmenený na 3000)
+        // WEBSOCKET PREPOJENIE NA live.js SERVER
         function connectWebSocket() {
             const ws = new WebSocket('ws://localhost:3000');
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    // Spracovanie dát prispôsobené tvojmu formátu { action, points }
                     window.addPointsFromTikTok(data.action, data.points);
                 } catch (e) {
                     console.error("Chyba spracovania dát:", e);
@@ -333,12 +472,10 @@
             ws.onclose = () => {
                 connStatus.textContent = "Live.js Odpojené";
                 connStatus.style.backgroundColor = "#e74c3c";
-                // Automatický pokus o znovupripojenie každých 5 sekúnd
                 setTimeout(connectWebSocket, 5000);
             };
         }
 
-        // Spustíme hneď po načítaní stránky
         connectWebSocket();
     </script>
 
